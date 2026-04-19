@@ -113,7 +113,7 @@ Iso dapat diunduh di
 ### Implementasi RAID 1
 1. Install tools `mdadm`
    ```
-   sudo apt install mdadm
+   sudo apt install mdadm -y
    ```
 2. Buat RAID antara `sdb` dan `sdc`
    ``` 
@@ -153,7 +153,7 @@ Iso dapat diunduh di
    ```
 10. Masukan konfigurasi berikut
     ```
-    UUID=[UUID md0] <- UUID=9d309007-7331-4b51-9c46-ad9f9d908e74  /data  ext4  defaults  0  0
+    UUID=[UUID md0] <- UUID=b4e8c2e5-2c76-4542-a770-241f9c6e59b9  /data  ext4  defaults  0  2
     ```
 11. Reload `systemd` untuk mengaplikasikannya
     ```
@@ -187,22 +187,22 @@ Iso dapat diunduh di
      ```
 
 2. Administrator
-   - Tambahkan grup `administrator`
+   - Tambahkan grup `member`
      ```
-     sudo groupadd administrator
+     sudo groupadd member
      ```
-   - Tambahkan user ke group `administrator`, buatkan home direktorinya, berikan shell, dan berikan password
+   - Tambahkan user ke group `member`, buatkan home direktorinya, berikan shell, dan berikan password
      ```
-     sudo useradd -m -g administrator -s /bin/bash rava
+     sudo useradd -m -g member -s /bin/bash rava
      echo "rava:rava" | sudo chpasswd
 
-     sudo useradd -m -g administrator -s /bin/bash ariiq
+     sudo useradd -m -g member -s /bin/bash ariiq
      echo "ariiq:ariiq" | sudo chpasswd
 
-     sudo useradd -m -g administrator -s /bin/bash fathan
+     sudo useradd -m -g member -s /bin/bash fathan
      echo "fathan:fathan" | sudo chpasswd
 
-     sudo useradd -m -g administrator -s /bin/bash rahmat
+     sudo useradd -m -g member -s /bin/bash rahmat
      echo "rahmat:rahmat" | sudo chpasswd
      ```
    - Tambahin permission sudo
@@ -211,11 +211,12 @@ Iso dapat diunduh di
      sudo usermod -aG sudo ariiq
      sudo usermod -aG sudo fathan
      sudo usermod -aG sudo rahmat
-     sudo usermod -aG administrator www-data
+     sudo usermod -aG member administrator
+     sudo usermod -aG member www-data
      ```
 3. Tambahin hak akses ke `/data`
    ```
-   sudo chown -R root:administrator /data
+   sudo chown -R root:member /data
    sudo chmod -R 2775 /data
    ```
 
@@ -392,18 +393,26 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
      ```
      sudo vi /etc/samba/smb.conf
      ```
+   - Masukan konfigurasi berikut
+     ```
      [Data-Center]
      path = /data
      browseable = yes
      read only = no
      guest ok = no
-     valid users = @administrator @public
+     valid users = administrator @member @public
      
      # Admin bisa nulis, user biasa cuma bisa baca
-     write list = @administrator
+     write list = administrator @member
+
+     # Access Control
+     create mask = 0664
+     directory mask = 0775
+     force group = member
      ```
    - Daftarin password Samba buat user
      ```
+     sudo smbpasswd -a administrator
      sudo smbpasswd -a user
      sudo smbpasswd -a rava
      sudo smbpasswd -a ariiq
@@ -418,7 +427,7 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
 ### Install Apache
 1. Install Apache
    ```
-   sudo apt install apache2
+   sudo apt install apache2 -y
    ```
 2. Buat folder web di RAID
    ```
@@ -473,11 +482,11 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
    ```
 3. Lakukan reload `systemd` untuk mengaplikasikannya
    ```
-   systemctl daemon-reload
+   sudo systemctl daemon-reload
    ```
 4. Aktifkan service yang telah dibuat
    ```
-   systemctl enable startup-update.service
+   sudo systemctl enable startup-update.service
    ```
 5. Cek Status Service
    ```
@@ -493,33 +502,33 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
    ```
    sudo mkdir -p /opt/scripts
    ```
-2. Buat script backup
-   ```
-   sudo vi /opt/scripts/daily_backup.sh
-   ```
-4. Buat direktori backup 
+2. Buat direktori backup 
    ```
    sudo mkdir -p /home/administrator/backups
    ```
-5. Tambahkan script berikut
+3. Buat script backup
+   ```
+   sudo vi /opt/scripts/daily_backup.sh
+   ```
+4. Tambahkan script berikut
    ```
    #!/bin/bash
    # Backup dari RAID ke folder backup di OS disk
    DEST="/home/administrator/backups/$(date +%Y-%m-%d)"
    mkdir -p $DEST
    rsync -av --delete /data/ $DEST
-   chown -R administrator:administrator /home/administrator/backups/$DEST
+   chown -R administrator:administrator $DEST
    echo "Backup completed at $(date)" >> /var/log/backup.log
    ```
-6. Berikan izin eksekusi
+5. Berikan izin eksekusi
    ```
    sudo chmod +x /opt/scripts/daily_backup.sh
    ```
-7. Edit `crontab`
+6. Edit `crontab`
    ```
    sudo crontab -e
    ```
-8. Tambahkan konfigurasi berikut
+7. Tambahkan konfigurasi berikut
    ```
    0 23 * * * /opt/scripts/daily_backup.sh
    ```
@@ -644,7 +653,7 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
      - https://github.com/cloudflare/cloudflared/releases/download/2026.3.0/cloudflared-windows-amd64.msi
      - Connect
        ```
-       ssh -o "ProxyCommand=cloudflared access ssh --hostname [Domain]" [Username]@[Domain]
+       ssh -o "ProxyCommand=cloudflared access ssh --hostname ssh.zeroxx.my.id" [Username]@ssh.zeroxx.my.id
        ```
 2. Linux Debian
    - Install
@@ -654,7 +663,7 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
      ```
    - Connect
      ```
-     ssh -o "ProxyCommand=cloudflared access ssh --hostname [Domain]" [Username]@[Domain]
+     ssh -o "ProxyCommand=cloudflared access ssh --hostname ssh.zeroxx.my.id" [Username]@ssh.zeroxx.my.id
      ```
 3. Mac Intel
    - Install melalui package manager
@@ -670,7 +679,7 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
      ```
    - Connect
      ```
-     ssh -o "ProxyCommand=/usr/local/bin/cloudflared access ssh --hostname [Domain]" [Username]@[Domain]
+     ssh -o "ProxyCommand=/usr/local/bin/cloudflared access ssh --hostname ssh.zeroxx.my.id" [Username]@ssh.zeroxx.my.id
      ```
 4. Mac M1/M2/M3 (Apple Silicon)
    - Install melalui package manager
@@ -686,7 +695,7 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
      ```
    - Connect
      ```
-     ssh -o "ProxyCommand=/usr/local/bin/cloudflared access ssh --hostname [Domain]" [Username]@[Domain]
+     ssh -o "ProxyCommand=/usr/local/bin/cloudflared access ssh --hostname ssh.zeroxx.my.id" [Username]@ssh.zeroxx.my.id
      ```
 
 ---
@@ -702,7 +711,7 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
      - Dapat menggunakan tool `bootinfoscript` 
        - Install `boot-info-script`
          ```
-         sudo apt install boot-info-script
+         sudo apt install boot-info-script -y
          ```
        - Jalankan `bootinfoscript`
          ```
@@ -719,7 +728,7 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
        ```
      - Dapat menggunakan tool `neofetch` atau `fastfetch`
        ```
-       sudo apt install neofetch/fastfetch
+       sudo apt install neofetch/fastfetch -y
        neofetch/fastfetch
        ```
    - Menampilkan daftar service yang aktif saat startup
@@ -827,7 +836,7 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
      - Dapat menggunakan glances
        - Install `glances`
          ```
-         apt install glances
+         sudo apt install glances -y
          ```
        - Jalankan `galnces`
          ```
@@ -837,7 +846,7 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
       - Stress-ng (The All-Rounder)
         - Install `stress-ng`
           ```
-          sudo install stress-ng
+          sudo apt install stress-ng -y
           ```
         - Jalankan `stress-ng`
           ```
@@ -846,7 +855,7 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
       - Apache Benchmark / ab (Khusus Web Server)
         - Install `apache2-utils`
           ```
-          sudo apt install apache2-utils
+          sudo apt install apache2-utils -y
           ```
         - Jalankan `apache2-utils`
           ```
@@ -855,7 +864,7 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
       - FIO - Flexible I/O Tester (Khusus RAID & Disk)
         - Install `fio`
           ```
-          sudo apt install fio
+          sudo apt install fio -y
           ```
         - Jalankan `fio`
           ```
