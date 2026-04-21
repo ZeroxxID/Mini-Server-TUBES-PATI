@@ -33,8 +33,9 @@ Iso dapat diunduh di
    - User: administrator
    - Password: PATI_Kelompok#7#administrator
 
+
 ## **WORST CASE SETELAH INSTALL TANPA** ***source.list***
-1. Kita akan tambahan list sumber repository secara manual di direktori Advance Package Tool (APT)
+1. Tambahan list sumber repository secara manual di direktori Advance Package Tool (APT)
    ```
    sudo vi /etc/apt/source.list
    ```
@@ -59,177 +60,20 @@ Iso dapat diunduh di
 ---
 
 ## **BASIC CONFIGURATION**
-### Configure Network Adapter
-1. Pada Ubuntu Server menggunakan netplan sebagai service nya
-   ```
-   sudo vi /etc/netplan/50-cloud-init.yaml
-   ```
-2. Tambahkan konfigurasi berikut ke `50-cloud-init.yaml`
-   ```
-   network:
-     version: 2
-     ethernets:
-       [Interface]: <- ens33:
-         dhcp4: true
-       [Interface]: <- ens34:
-         dhcp4: false
-         addresses:
-           - IP/CIDR <- 2.2.2.2/8
-   ```
-3. Aplikasikan konfigurasi `netplan`
-   ```
-   sudo netplan apply
-   ```
-
-### Network Time Protocol (NTP) Client
-1. Tampilkan detail informasi mengenai waktu
-   ```
-   timedatectl
-   ```
-2. Jika time zone masih wilayah luar
-   ```
-   sudo timedatectl set-timezone Asia/Jakarta
-   ```
-3. Jika NTP Service tidak aktif
-   ```
-   sudo timedatectl set-ntp true
-   ```
-4. Lakukan konfigurasi NTP agar waktu sinkron dengan wilayah Jakarta di direktori `systemd`
-   ```
-   sudo vi /etc/systemd/timesyncd.conf
-   ```
-5. Hilangkan `#` pada bagian `NTP=` dan tambahakan pool seperti berikut
-   ```
-   NTP=id.pool.ntp.org
-   ```
-6. Lakukan restart service untuk mengaplikasikannya
-   ```
-   sudo systemctl restart systemd-timesyncd
-   ```
-
----
-
-## **CORE CONFIGURATION**
-### Implementasi RAID 1
-1. Install tools `mdadm`
-   ```
-   sudo apt install mdadm -y
-   ```
-2. Buat RAID antara `sdb` dan `sdc`
-   ``` 
-   sudo mdadm --create --verbose /dev/md0 --level=1 --raid-devices=2 /dev/sdb /dev/sdc
-   ```
-3. Untuk mengecek status sinkronisasi
-   ```
-   cat /proc/mdstat
-   ```
-4. Format `md0` menjadi file sistem bertipe `ext4`
-   ```
-   sudo mkfs.ext4 /dev/md0
-   ```
-5. Buat lokasi mount point
-   ```
-   sudo mkdir -p /data
-   ```
-6. Mount disk `md0` ke partisi `/data` 
-   ```
-   sudo mount /dev/md0 /data
-   ```
-6. Update konfigurasi di `mdadm`
-   ```
-   sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf
-   ```
-7. Update `initramfs`
-   ```
-   sudo update-initramfs -u
-   ```
-8. Cek UUID `md0`
-   ```
-   sudo blkid /dev/md0
-   ```
-9. Masukan UUID tersebut ke `fstab`
-   ```
-   sudo vi /etc/fstab
-   ```
-10. Masukan konfigurasi berikut
-    ```
-    UUID=[UUID md0] <- UUID=b4e8c2e5-2c76-4542-a770-241f9c6e59b9  /data  ext4  defaults  0  2
-    ```
-11. Reload `systemd` untuk mengaplikasikannya
-    ```
-    sudo systemctl daemon-reload
-    ```
-
-### Verifikasi RAID
-1. Unmount partisi `/data`
-   ```
-   sudo umount /data
-   ```
-2. Test Auto-Mount dari `fstab`
-   ```
-   sudo mount -a
-   ```
-3. Cek status
-   ```
-   df -h | grep /data
-   ```
-
-### Access Control List
-1. User
-   - Tambahkan grup `public`
-     ```
-     sudo groupadd public
-     ```
-   - Tambahkan user ke group `public`, buatkan home direktorinya, berikan shell, dan berikan password
-     ```
-     sudo useradd -m -g public -s /bin/bash user
-     echo "user:user" | sudo chpasswd
-     ```
-
-2. Administrator
-   - Tambahkan grup `member`
-     ```
-     sudo groupadd member
-     ```
-   - Tambahkan user ke group `member`, buatkan home direktorinya, berikan shell, dan berikan password
-     ```
-     sudo useradd -m -g member -s /bin/bash rava
-     echo "rava:rava" | sudo chpasswd
-
-     sudo useradd -m -g member -s /bin/bash ariiq
-     echo "ariiq:ariiq" | sudo chpasswd
-
-     sudo useradd -m -g member -s /bin/bash fathan
-     echo "fathan:fathan" | sudo chpasswd
-
-     sudo useradd -m -g member -s /bin/bash rahmat
-     echo "rahmat:rahmat" | sudo chpasswd
-     ```
-   - Tambahin permission sudo
-     ```
-     sudo usermod -aG sudo rava
-     sudo usermod -aG sudo ariiq
-     sudo usermod -aG sudo fathan
-     sudo usermod -aG sudo rahmat
-     sudo usermod -aG member administrator
-     sudo usermod -aG member www-data
-     ```
-3. Tambahin hak akses ke `/data`
-   ```
-   sudo chown -R root:member /data
-   sudo chmod -R 2775 /data
-   ```
-
 ### SSH Server
 1. Install SSH Server
    ```
    sudo apt install openssh-server
    ```
-2. Ubah sedikit konfigurasi `ssh`
+2. Aktifkan service `ssh`
+   ```
+   sudo systemctl enable ssh
+   ```
+3. Ubah sedikit konfigurasi `ssh`
    ```
    sudo vi /etc/ssh/sshd_config
    ```
-3. Masukan konfigurasi berikut
+4. Masukan konfigurasi berikut
    ```
    # This is the sshd server system-wide configuration file.  See
    # sshd_config(5) for more information.
@@ -362,67 +206,262 @@ Iso dapat diunduh di
    #	PermitTTY no
    #	ForceCommand cvs server
    ```
-4. Restart `ssh`
+5. Restart service SSH
    ```
    sudo systemctl restart ssh
    ```
 
 ### Copy File on SSH
-```
-scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
-```
+1. Copy file dari server ke lokal
+   ```
+   scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
+   ```
+2. Copy file dari lokal ke server
+   ```
+   scp [Path File Lokal] [Username]@[IP/Domain]:[Path File Server] 
+   ```
 
-## **WORST CASE SSH TIDAK BISA CONNECT**
-1. Cek status `ssh`
+### Tunneling SSH dengan Domain
+1. Buka `cloudflare` dan login: https://cloudflare.com/
+2. Klik `Zero Trust` pada menu Protect & Connect
+3. Klik menu `Network` dan pilih submenu `Overview`
+4. Klik `Manage Tunnels`, klik `Add a Tunnel`
+5. Isi `Tunnel Name` <- PATI
+6. Install dan Run Connector dengan Operating System `Debian`
+7. Buat direktori `scripts`
    ```
-   systemctl status ssh
+   sudo mkdir -p /opt/scripts
    ```
-2. Jika `disable`
+8. Buat shell script agar memudahkan
    ```
-   sudo systemctl enable ssh
+   sudo vi /opt/scripts/cloudflare.sh
    ```
-3. Jika `enable` silahkan gunakan IP yang berbeda untuk VMnet2
+9.  Tambahkan script berikut
+   ```
+   # Add cloudflare gpg key
+   sudo mkdir -p --mode=0755 /usr/share/keyrings
+   curl -fsSL https://pkg.cloudflare.com/cloudflare-public-v2.gpg | sudo tee /usr/share/keyrings/cloudflare-public-v2.gpg >/dev/null
 
-## File Sharing
-1. Samba Server
-   - Install Samba
-     ```
-     sudo apt install samba -y
-     ```
-   - Konfigurasi folder sharing di /data (RAID):
-     ```
-     sudo vi /etc/samba/smb.conf
-     ```
-   - Masukan konfigurasi berikut
-     ```
-     [Data-Center]
-     path = /data
-     browseable = yes
-     read only = no
-     guest ok = no
-     valid users = administrator @member @public
-     
-     # Admin bisa nulis, user biasa cuma bisa baca
-     write list = administrator @member
+   # Add this repo to your apt repositories
+   echo 'deb [signed-by=/usr/share/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
 
-     # Access Control
-     create mask = 0664
-     directory mask = 0775
-     force group = member
-     ```
-   - Daftarin password Samba buat user
-     ```
-     sudo smbpasswd -a administrator
-     sudo smbpasswd -a user
-     sudo smbpasswd -a rava
-     sudo smbpasswd -a ariiq
-     sudo smbpasswd -a fathan
-     sudo smbpasswd -a rahmat
-     ```
-   - Restart service
-     ```
-     sudo systemctl restart smbd
-     ```
+   # install cloudflared
+   sudo apt-get update && sudo apt-get install cloudflared
+
+   # Install Token
+   sudo cloudflared service install [Token]
+   ```
+10. Beri izin eksekusi
+    ```
+    sudo chmod +x /opt/scripts/cloudflare.sh
+    ```
+11. Isi Hostname `Subdomain` <- ssh, `Domain` <- zeroxx.my.id
+12. Isi Service `Type` <- ssh, `URL` <- localhost:22
+
+
+### Configure Network Adapter
+1. Pada Ubuntu Server menggunakan netplan sebagai service nya
+   ```
+   sudo vi /etc/netplan/50-cloud-init.yaml
+   ```
+2. Tambahkan konfigurasi berikut ke `50-cloud-init.yaml`
+   ```
+   network:
+     version: 2
+     ethernets:
+       [Interface]: <- ens33:
+         dhcp4: true
+       [Interface]: <- ens34:
+         dhcp4: false
+         addresses:
+           - IP/CIDR <- 2.2.2.2/8
+         nameserver:
+           addresses:
+              - 1.1.1.1
+              - 8.8.8.8
+   ```
+3. Aplikasikan konfigurasi `netplan`
+   ```
+   sudo netplan apply
+   ```
+
+### Network Time Protocol (NTP) Client
+1. Tampilkan detail informasi mengenai waktu
+   ```
+   timedatectl
+   ```
+2. Jika time zone masih wilayah luar
+   ```
+   sudo timedatectl set-timezone Asia/Jakarta
+   ```
+3. Jika NTP Service tidak aktif
+   ```
+   sudo timedatectl set-ntp true
+   ```
+4. Lakukan konfigurasi NTP agar waktu sinkron dengan wilayah Indonesia di direktori `systemd`
+   ```
+   sudo vi /etc/systemd/timesyncd.conf
+   ```
+5. Hilangkan `#` pada bagian `NTP=` dan tambahakan pool seperti berikut
+   ```
+   NTP=id.pool.ntp.org
+   ```
+6. Lakukan restart service untuk mengaplikasikannya
+   ```
+   sudo systemctl restart systemd-timesyncd
+   ```
+
+---
+
+## **CORE CONFIGURATION**
+### Implementasi RAID 1
+1. Install tools `mdadm`
+   ```
+   sudo apt install mdadm -y
+   ```
+2. Buat RAID antara `sdb` dan `sdc`
+   ``` 
+   sudo mdadm --create --verbose /dev/md0 --level=1 --raid-devices=2 /dev/sdb /dev/sdc
+   ```
+3. Untuk mengecek status sinkronisasi
+   ```
+   cat /proc/mdstat
+   ```
+4. Format `md0` menjadi file sistem bertipe `ext4`
+   ```
+   sudo mkfs.ext4 /dev/md0
+   ```
+5. Buat lokasi mount point
+   ```
+   sudo mkdir -p /data
+   ```
+6. Mount disk `md0` ke partisi `/data` 
+   ```
+   sudo mount /dev/md0 /data
+   ```
+6. Update konfigurasi di `mdadm`
+   ```
+   sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf
+   ```
+7. Update `initramfs`
+   ```
+   sudo update-initramfs -u
+   ```
+8. Cek UUID `md0`
+   ```
+   sudo blkid /dev/md0
+   ```
+9. Masukan UUID tersebut ke `fstab`
+   ```
+   sudo vi /etc/fstab
+   ```
+10. Masukan konfigurasi berikut
+    ```
+    UUID=[UUID md0] <- UUID=3551f487-25be-48f4-b3cc-a76728ba0750  /data  ext4  defaults  0  2
+    ```
+11. Reload `systemd` untuk mengaplikasikannya
+    ```
+    sudo systemctl daemon-reload
+    ```
+
+### Verifikasi RAID
+1. Unmount partisi `/data`
+   ```
+   sudo umount /data
+   ```
+2. Test Auto-Mount dari `fstab`
+   ```
+   sudo mount -a
+   ```
+3. Cek status
+   ```
+   df -h | grep /data
+   ```
+
+### Membuat Service Startup Update
+1. Buat service baru di direktori `system`
+   ```
+   sudo vi /etc/systemd/system/startup-update.service
+   ```
+2. Tambahkan konfigurasi berikut
+   ```
+   [Unit]
+   Description=Auto Update and Upgrade on Startup
+   After=network-online.target
+   Wants=network-online.target
+
+   [Service]
+   Type=oneshot
+   ExecStart=/usr/bin/apt update -y
+   ExecStart=/usr/bin/apt upgrade -y
+   StandardOutput=journal
+   StandardError=journal
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+3. Lakukan daemon reload untuk mengaplikasikannya
+   ```
+   sudo systemctl daemon-reload
+   ```
+4. Aktifkan service yang telah dibuat
+   ```
+   sudo systemctl enable startup-update.service
+   ```
+5. Cek Status Service
+   ```
+   systemctl status [nama].service
+   ```
+6. Cek Log Service Spesifik
+   ```
+   journalctl -u [nama].service
+   ```
+
+### Otomasi Backup Data Pada 23.00
+1. Buat direktori backup 
+   ```
+   sudo mkdir -p /home/administrator/backups
+   ```
+2. Buat script backup
+   ```
+   sudo vi /opt/scripts/daily_backup.sh
+   ```
+3. Tambahkan script berikut
+   ```
+   #!/bin/bash
+   # Backup dari RAID ke folder backup di OS disk
+   DEST="/home/administrator/backups/$(date +%Y-%m-%d)"
+   mkdir -p $DEST
+   rsync -av --delete /data/ $DEST
+   chown -R administrator:administrator $DEST
+   echo "Backup completed at $(date)" >> /var/log/backup.log
+   ```
+4. Berikan izin eksekusi
+   ```
+   sudo chmod +x /opt/scripts/daily_backup.sh
+   ```
+5. Edit jadwal di `crontab`
+   ```
+   sudo crontab -e
+   ```
+6. Tambahkan konfigurasi berikut
+   ```
+   0 23 * * * /opt/scripts/daily_backup.sh
+   ```
+
+### Otomasi Reboot Pada 00.00
+1. Edit jadwal di `crontab`
+   ```
+   sudo crontab -e
+   ```
+2. Tambahkan konfigurasi berikut
+   ```
+   0 0 * * * /usr/bin/systemctl reboot
+   ```
+3. Mengecek jadwal yang berjalan
+   ```
+   sudo crontab -l
+   ```
 
 ### Install Apache
 1. Install Apache
@@ -447,117 +486,31 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
    ```
 6. Ubah konfigurasi sebagai berikut
    ```
-   <Directory /data/www/html>
+   <Directory /data/www/>
       Options Indexes FollowSymLinks
       AllowOverride None
       Require all granted
    </Directory>
    ```
-7. Restart Apache
+7. Restart service Apache
    ```
    sudo systemctl restart apache2
    ```
 
-### Membuat Service Startup Update
-1. Buat service baru di direktori `systemd`
-   ```
-   sudo vi /etc/systemd/system/startup-update.service
-   ```
-2. Tambahkan konfigurasi berikut
-   ```
-   [Unit]
-   Description=Auto Update and Upgrade on Startup
-   After=network-online.target
-   Wants=network-online.target
-
-   [Service]
-   Type=oneshot
-   ExecStart=/usr/bin/apt update -y
-   ExecStart=/usr/bin/apt upgrade -y
-   StandardOutput=journal
-   StandardError=journal
-
-   [Install]
-   WantedBy=multi-user.target
-   ```
-3. Lakukan reload `systemd` untuk mengaplikasikannya
-   ```
-   sudo systemctl daemon-reload
-   ```
-4. Aktifkan service yang telah dibuat
-   ```
-   sudo systemctl enable startup-update.service
-   ```
-5. Cek Status Service
-   ```
-   systemctl status [nama].service
-   ```
-6. Cek Log Service Spesifik
-   ```
-   journalctl -u [nama].service
-   ```
-
-### Otomasi Backup Data Pada 23.00
-1. Buat folder script
-   ```
-   sudo mkdir -p /opt/scripts
-   ```
-2. Buat direktori backup 
-   ```
-   sudo mkdir -p /home/administrator/backups
-   ```
-3. Buat script backup
-   ```
-   sudo vi /opt/scripts/daily_backup.sh
-   ```
-4. Tambahkan script berikut
-   ```
-   #!/bin/bash
-   # Backup dari RAID ke folder backup di OS disk
-   DEST="/home/administrator/backups/$(date +%Y-%m-%d)"
-   mkdir -p $DEST
-   rsync -av --delete /data/ $DEST
-   chown -R administrator:administrator $DEST
-   echo "Backup completed at $(date)" >> /var/log/backup.log
-   ```
-5. Berikan izin eksekusi
-   ```
-   sudo chmod +x /opt/scripts/daily_backup.sh
-   ```
-6. Edit `crontab`
-   ```
-   sudo crontab -e
-   ```
-7. Tambahkan konfigurasi berikut
-   ```
-   0 23 * * * /opt/scripts/daily_backup.sh
-   ```
-
-### Otomasi Reboot Pada 00.00
-1. Edit `crontab`
-   ```
-   sudo crontab -e
-   ```
-2. Tambahkan konfigurasi berikut
-   ```
-   0 0 * * * /usr/bin/systemctl reboot
-   ```
-3. Mengecek jadwal yang berjalan
-   ```
-   sudo crontab -l
-   ```
-
 ## NFtable
-1. Install dan aktifkan `nftables`
+1. Install `nftables`
    ```
    sudo apt install nftables -y
+   ```
+2. Aktifkan service `nftables`
+   ```
    sudo systemctl enable nftables
    ```
-2. Konfigurasi Rule Utama:
+3. Konfigurasi Rule Utama:
    ```
    sudo vi /etc/nftables.conf
    ```
-3. Tambahkan rule berikut
+4. Tambahkan rule berikut
    ```
    #!/usr/sbin/nft -f
 
@@ -579,9 +532,9 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
            # 4. Allow HTTP (Port 80) buat Web Server lo
            tcp dport 80 accept
    
-           # 5. Allow Samba (Port 139, 445) & NetBIOS (137, 138)
-           tcp dport { 139, 445 } accept
-           udp dport { 137, 138 } accept
+           # 5. Allow Samba (Port 139, 445), NetBIOS (137, 138), Cloudflared (443, 7844)
+           tcp dport { 139, 443, 445 } accept
+           udp dport { 137, 138, 7844 } accept
    
            # 6. Allow ICMP (Ping) buat diagnosa jaringan
            ip protocol icmp accept
@@ -596,12 +549,102 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
        }
    }
    ```
-3. Terapkan, berikan izin, dan cek status
+5. Terapkan rules
    ```
    sudo nft -f /etc/nftables.conf
-   sudo chmod +x /etc/nftables.conf
+   ```
+6. Untuk cek status dapat menggunakan
+   ```
    sudo nft list ruleset
    ```
+
+### Access Control List
+1. User
+   - Tambahkan grup `public`
+     ```
+     sudo groupadd public
+     ```
+   - Tambahkan user ke group `public`, buatkan home direktorinya, berikan shell, dan berikan password
+     ```
+     sudo useradd -m -g public -s /bin/bash user
+     echo "user:user" | sudo chpasswd
+     ```
+
+2. Administrator
+   - Tambahkan grup `member`
+     ```
+     sudo groupadd member
+     ```
+   - Tambahkan user ke group `member`, buatkan home direktorinya, berikan shell, dan berikan password
+     ```
+     sudo useradd -m -g member -s /bin/bash rava
+     echo "rava:rava" | sudo chpasswd
+
+     sudo useradd -m -g member -s /bin/bash ariiq
+     echo "ariiq:ariiq" | sudo chpasswd
+
+     sudo useradd -m -g member -s /bin/bash fathan
+     echo "fathan:fathan" | sudo chpasswd
+
+     sudo useradd -m -g member -s /bin/bash rahmat
+     echo "rahmat:rahmat" | sudo chpasswd
+     ```
+3. Tambahin permission sudo
+   ```
+   sudo usermod -aG sudo rava
+   sudo usermod -aG sudo ariiq
+   sudo usermod -aG sudo fathan
+   sudo usermod -aG sudo rahmat
+   sudo usermod -aG member administrator
+   sudo usermod -aG member www-data
+   ```
+4. Tambahin hak akses ke `/data`
+   ```
+   sudo chown -R root:member /data
+   sudo chmod -R 2775 /data
+   sudo chmod -R 750 /data/www
+   ```
+
+## File Sharing
+### Samba Server
+- Install Samba
+  ```
+  sudo apt install samba -y
+  ```
+- Konfigurasi folder sharing di /data (RAID):
+  ```
+  sudo vi /etc/samba/smb.conf
+  ```
+- Masukan konfigurasi berikut
+  ```
+  [Data-Center]
+  path = /data
+  browseable = yes
+  read only = no
+  guest ok = no
+  valid users = administrator @member @public
+     
+  # Admin bisa nulis, user biasa cuma bisa baca
+  write list = administrator @member
+
+  # Access Control
+  create mask = 0664
+  directory mask = 0775
+  force group = member
+  ```
+- Daftarin password Samba buat user
+  ```
+  sudo smbpasswd -a administrator
+  sudo smbpasswd -a user
+  sudo smbpasswd -a rava
+  sudo smbpasswd -a ariiq
+  sudo smbpasswd -a fathan
+  sudo smbpasswd -a rahmat
+  ```
+- Restart service Samba
+  ```
+  sudo systemctl restart smbd
+  ```
 
 ---
 
@@ -615,36 +658,6 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
    ```
    reboot
    ```
-
-### Tunneling SSH dengan Domain
-1. Buka `cloudflare` dan login: https://cloudflare.com/
-2. Klik `Zero Trust` pada menu Protect & Connect
-3. Klik menu `Network` dan pilih submenu `Overview`
-4. Klik `Manage Tunnels`, klik `Add a Tunnel`
-5. Isi `Tunnel Name` <- PATI
-6. Install dan Run Connector dengan Operating System `Debian`
-7. Buat Shell Script agar memudahkan
-   ```
-   sudo vi /opt/scripts/cloudflare.sh
-   ```
-8. Tambahkan script berikut
-   ```
-   # Add cloudflare gpg key
-   sudo mkdir -p --mode=0755 /usr/share/keyrings
-
-   curl -fsSL https://pkg.cloudflare.com/cloudflare-public-v2.gpg | sudo tee /usr/share/keyrings/cloudflare-public-v2.gpg >/dev/null
-
-   # Add this repo to your apt repositories
-   echo 'deb [signed-by=/usr/share/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
-
-   # install cloudflared
-   sudo apt-get update && sudo apt-get install cloudflared
-
-   # Install Token
-   sudo cloudflared service install [Token]
-   ```
-8. Isi Hostname `Subdomain` <- ssh, `Domain` <- zeroxx.my.id
-9.  Isi Service `Type` <- ssh, `URL` <- localhost:22
 
 ### SSH Client
 1. Windows
@@ -797,7 +810,7 @@ scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
 
 ---
 
-## Keamanan Data (RAID / Failure Handling)()()
+## Keamanan Data (RAID / Failure Handling)
 1. Kelompok harus melakukan salah satu:
    - Mengimplementasikan RAID 1 (mirroring), atau -> Sudah diimplementasikan pada `Core Configuration`
    - Menyusun mekanisme cadangan data manual -> Sudah diimplementasikan pada `Core Configuration`
