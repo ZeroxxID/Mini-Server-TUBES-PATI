@@ -19,12 +19,22 @@ Iso dapat diunduh di
    - Nama: PATI Kelompok 7
    - Disk: 64 GB x 3 (1 OS, 2 RAID)
    - Memory: 8 GB
-   - Procesor: 4 Cores
+   - Procesor: 8 Cores
    - Network Adapter 
      - Bridge = DHCP
      - Custom VMnet2 = Static
+     - Custom VMnet3 = Static
+2. Virtual Machine Configuration Backup
+   - Nama: PATI Kelompok 7 Backup
+   - Disk: 64 GB x 3 (1 OS, 2 RAID)
+   - Memory: 8 GB
+   - Procesor: 8 Cores
+   - Network Adapter 
+     - Bridge = DHCP
+     - Custom VMnet2 = Static
+     - Custom VMnet3 = Static
 
-2. Instalasi OS Ubuntu Server
+3. Instalasi OS Ubuntu Server
    - Bahasa: English
    - Keyboard Layout: English (US) 
    - Mirror Address: https://mirror.unair.ac.id/ubuntu
@@ -211,14 +221,30 @@ Iso dapat diunduh di
    sudo systemctl restart ssh
    ```
 
-### Copy File on SSH
-1. Copy file dari server ke lokal
+### Configure Network Adapter
+1. Pada Ubuntu Server menggunakan netplan sebagai service nya
    ```
-   scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
+   sudo vi /etc/netplan/50-cloud-init.yaml
    ```
-2. Copy file dari lokal ke server
+2. Tambahkan konfigurasi berikut ke `50-cloud-init.yaml`
    ```
-   scp [Path File Lokal] [Username]@[IP/Domain]:[Path File Server] 
+   network:
+     version: 2
+     ethernets:
+       [Interface]: <- ens33:
+         dhcp4: true
+       [Interface]: <- ens34:
+         dhcp4: false
+         addresses:
+           - IP/CIDR <- 2.2.2.2/8
+       [Interface]: <- ens35:
+         dhcp4: false
+         addresses:
+           - IP/CIDR <- 20.20.20.20/24 | 20.20.20.22/24
+   ```
+3. Aplikasikan konfigurasi `netplan`
+   ```
+   sudo netplan apply
    ```
 
 ### Tunneling SSH dengan Domain
@@ -236,7 +262,7 @@ Iso dapat diunduh di
    ```
    sudo vi /opt/scripts/cloudflare.sh
    ```
-9.  Tambahkan script berikut
+9. Tambahkan script berikut
    ```
    # Add cloudflare gpg key
    sudo mkdir -p --mode=0755 /usr/share/keyrings
@@ -255,35 +281,13 @@ Iso dapat diunduh di
     ```
     sudo chmod +x /opt/scripts/cloudflare.sh
     ```
-11. Isi Hostname `Subdomain` <- ssh, `Domain` <- zeroxx.my.id
-12. Isi Service `Type` <- ssh, `URL` <- localhost:22
+11. Jalankan scriptnya
+    ```
+    /opt/scripts/cloudflare.sh
+    ```
+12. Isi Hostname `Subdomain` <- ssh, `Domain` <- zeroxx.my.id
+13. Isi Service `Type` <- ssh, `URL` <- localhost:22
 
-
-### Configure Network Adapter
-1. Pada Ubuntu Server menggunakan netplan sebagai service nya
-   ```
-   sudo vi /etc/netplan/50-cloud-init.yaml
-   ```
-2. Tambahkan konfigurasi berikut ke `50-cloud-init.yaml`
-   ```
-   network:
-     version: 2
-     ethernets:
-       [Interface]: <- ens33:
-         dhcp4: true
-       [Interface]: <- ens34:
-         dhcp4: false
-         addresses:
-           - IP/CIDR <- 2.2.2.2/8
-         nameserver:
-           addresses:
-              - 1.1.1.1
-              - 8.8.8.8
-   ```
-3. Aplikasikan konfigurasi `netplan`
-   ```
-   sudo netplan apply
-   ```
 
 ### Network Time Protocol (NTP) Client
 1. Tampilkan detail informasi mengenai waktu
@@ -357,7 +361,7 @@ Iso dapat diunduh di
    ```
 10. Masukan konfigurasi berikut
     ```
-    UUID=[UUID md0] <- UUID=3551f487-25be-48f4-b3cc-a76728ba0750  /data  ext4  defaults  0  2
+    UUID=[UUID md0] <- UUID=ccee6545-9bed-44d4-ab8f-333c735eec7a /data  ext4  defaults  0  2
     ```
 11. Reload `systemd` untuk mengaplikasikannya
     ```
@@ -433,18 +437,22 @@ Iso dapat diunduh di
    DEST="/home/administrator/backups/$(date +%Y-%m-%d)"
    mkdir -p $DEST
    rsync -av --delete /data/ $DEST
-   chown -R administrator:administrator $DEST
+   chown -R administrator:member $DEST
    echo "Backup completed at $(date)" >> /var/log/backup.log
    ```
 4. Berikan izin eksekusi
    ```
    sudo chmod +x /opt/scripts/daily_backup.sh
    ```
-5. Edit jadwal di `crontab`
+5. Ubah akses backup ke owner administrator group member
+   ```
+   sudo chown -R administrator:member /home/administrator/backups
+   ```
+6. Edit jadwal di `crontab`
    ```
    sudo crontab -e
    ```
-6. Tambahkan konfigurasi berikut
+7. Tambahkan konfigurasi berikut
    ```
    0 23 * * * /opt/scripts/daily_backup.sh
    ```
@@ -525,6 +533,11 @@ Iso dapat diunduh di
    
            # 2. Allow traffic yang sudah terjalin (Established/Related)
            ct state established,related accept
+
+           # --- BAGIAN HARDENING: DENY TELNET ---
+           # Kita taruh di atas biar dicek duluan (Explicit Deny)
+           tcp dport 23 reject with tcp reset
+           # -------------------------------------
    
            # 3. Allow SSH (Port 22) - Krusial buat Remote
            tcp dport 22 accept
@@ -602,7 +615,7 @@ Iso dapat diunduh di
    ```
    sudo chown -R root:member /data
    sudo chmod -R 2775 /data
-   sudo chmod -R 750 /data/www
+   sudo chmod -R 770 /data/www
    ```
 
 ## File Sharing
@@ -630,7 +643,8 @@ Iso dapat diunduh di
   # Access Control
   create mask = 0664
   directory mask = 0775
-  force group = member
+  force create mode = 0664
+  force directory mode = 0775
   ```
 - Daftarin password Samba buat user
   ```
@@ -657,6 +671,16 @@ Iso dapat diunduh di
 2. Lakukan restart untuk mengaplikasikannya.
    ```
    reboot
+   ```
+
+### Copy File on SSH
+1. Copy file dari server ke lokal
+   ```
+   scp [Username]@[IP/Domain]:[Path File Server] [Path File Lokal]
+   ```
+2. Copy file dari lokal ke server
+   ```
+   scp [Path File Lokal] [Username]@[IP/Domain]:[Path File Server] 
    ```
 
 ### SSH Client
@@ -829,7 +853,7 @@ Iso dapat diunduh di
       ```
    - Membuktikan sistem atau data tetap dapat diakses
 
-1. Output wajib:
+2. Output wajib:
    - Demo kondisi normal & gagal
    - Penjelasan skenario pemulihan
 
@@ -851,7 +875,7 @@ Iso dapat diunduh di
          ```
          sudo apt install glances -y
          ```
-       - Jalankan `galnces`
+       - Jalankan `glances`
          ```
          glances
          ```
@@ -872,7 +896,7 @@ Iso dapat diunduh di
           ```
         - Jalankan `apache2-utils`
           ```
-          ab -n 1000 -c 100 [Domain] <- web.zeroxx.my.id
+          ab -n 1000 -c 100 https://[Domain]/ <- https://web.zeroxx.my.id/
           ```
       - FIO - Flexible I/O Tester (Khusus RAID & Disk)
         - Install `fio`
@@ -894,8 +918,8 @@ Iso dapat diunduh di
 ## Update Sistem & Keamanan Dasar
 1. Kelompok harus: 
    - Melakukan update sistem operasi -> Otomatis berjalan setelah startup
-   - Mengaktifkan firewall 
-   - Menutup minimal 1 port
+   - Mengaktifkan firewall -> Menggunakan nftables
+   - Menutup minimal 1 port -> Menutup port telnet (port 23)
 
 2. Output wajib:
    - Screenshot status update
