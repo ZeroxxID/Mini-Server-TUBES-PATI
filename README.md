@@ -275,7 +275,7 @@ Iso dapat diunduh di
    sudo apt-get update && sudo apt-get install cloudflared
 
    # Install Token
-   sudo cloudflared service install [Token]
+   sudo cloudflared service install [TOKEN]
    ```
 10. Beri izin eksekusi
     ```
@@ -939,3 +939,13 @@ Iso dapat diunduh di
 2. Output wajib:
    - Demo layanan berjalan
    - Penjelasan arsitektur
+
+---
+
+# **NOTES**
+- [Panduan Praktikum Sistem Operasi Mendalam](https://gemini.google.com/share/13ee7358670b)
+- [Linux file permissions explained](https://www.redhat.com/en/blog/linux-file-permissions-explained)
+- [Linux permissions: SUID, SGID, and sticky bit](https://www.redhat.com/en/blog/suid-sgid-sticky-bit)
+
+# **ARTEFAK**
+Google Drive: [Link](https://drive.google.com/drive/folders/1M9WvCI3DyKmOOZuBw8ShfZfsCL-sXctf?usp=sharing)
